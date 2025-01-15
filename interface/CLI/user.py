@@ -26,6 +26,7 @@ class UserCli:
 
         self.data = Data()
         self.net = Request()
+        self.info = Info(net=self.net)
 
         # 配置
         self.config = {
@@ -35,6 +36,8 @@ class UserCli:
             "header": {},
             # 购买人
             "buyer": [],
+            # 收货信息
+            "deliver": {},
             # 绑定手机号
             "phone": "",
         }
@@ -82,7 +85,7 @@ class UserCli:
             try:
                 match mode:
                     case "扫描二维码":
-                        print("请使用B站手机客户端扫描二维码, 如果命令行内二维码无法正常显示, 请打开软件目录下的 qr.jpg 进行扫描")
+                        print("请使用B站手机客户端扫描二维码")
                         return login.QRCode()
 
                     case "浏览器登录":
@@ -134,7 +137,7 @@ class UserCli:
             购买人
             """
             try:
-                buyerInfo = Info(net=self.net).Buyer()
+                buyerInfo = self.info.Buyer()
                 choice = {f"{i['购买人']} - {i['身份证']} - {i['手机号']}": x for x, i in enumerate(buyerInfo)}
 
                 select = self.data.Inquire(
@@ -152,6 +155,29 @@ class UserCli:
                     id = choice[i]
                     dist.append(buyerInfo[id]["数据"])
                 return dist
+
+            except InfoException:
+                logger.error("选择错误! 请重新打开进行配置")
+                sleep(5)
+                sys.exit()
+
+        @logger.catch
+        def DeliverStep() -> dict:
+            """
+            收货信息
+            """
+            try:
+                deliver = self.info.Deliver()
+                choice = {f"{i['收货人']} - {i['手机号']} - {i['地址']}": x for x, i in enumerate(deliver)}
+
+                select = self.data.Inquire(
+                    type="List",
+                    message="请选择收货信息",
+                    choices=list(choice.keys()),
+                )
+
+                id = choice[select]
+                return deliver[id]["数据"]
 
             except InfoException:
                 logger.error("选择错误! 请重新打开进行配置")
@@ -192,6 +218,12 @@ class UserCli:
         self.config["cookie"] = LoginStep()
         self.config["header"] = self.net.GetHeader()
         self.config["buyer"] = BuyerStep()
+        self.config["deliver"] = DeliverStep()
         self.config["phone"] = PhoneStep()
-        self.conf.Save(FilenameStep(name=self.config["buyer"][0]["name"]), self.config, encrypt=self.isEncrypt)
+        self.config["userinfo"] = self.info.Userinfo()
+        self.conf.Save(
+            FilenameStep(name=self.config["buyer"][0]["name"]),
+            self.config,
+            encrypt=self.isEncrypt,
+        )
         return self.config

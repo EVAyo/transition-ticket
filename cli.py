@@ -10,7 +10,7 @@ from util import Bilibili, Captcha, Config, Request, Task
 
 def cleanup_meipass() -> None:
     if hasattr(sys, "_MEIPASS"):
-        meipass_path = sys._MEIPASS  # type: ignore
+        meipass_path = sys._MEIPASS
         try:
             shutil.rmtree(meipass_path)
             print(f"正在清理 {meipass_path}")
@@ -26,13 +26,13 @@ if __name__ == "__main__":
         """
 |=====================================================================
 |
-|  欢迎使用 https://github.com/biliticket/transition-ticket
-|  TG交流群 https://t.me/bilibili_ticket
+|  欢迎使用 github.com/biliticket/transition-ticket
+|  TG交流群 t.me/bilibili_ticket
 |  本程序仅供学习交流, 不得用于商业用途
 |  使用本程序进行违法操作产生的法律责任由操作者自行承担
 |  对本程序进行二次开发/分发时请注意遵守GPL-3.0开源协议
 |  本脚本仅适用于蹲回流票, 我们反对将其用于抢票
-|  黄牛/收费代抢４０００＋
+|  黄牛 / 收费代抢 ４０００＋
 |
 |=====================================================================
 |
@@ -90,7 +90,9 @@ if __name__ == "__main__":
             skuId=productConfig["skuId"],
             buyer=userConfig["buyer"],
             count=len(userConfig["buyer"]),
+            deliver=userConfig["deliver"],
             phone=userConfig["phone"],
+            userinfo=userConfig["userinfo"],
         )
 
         job = Task(

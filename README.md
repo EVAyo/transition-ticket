@@ -12,18 +12,17 @@
 
 本脚本仅适用于蹲回流票, 我们反对将其用于抢票,
 
-黄牛/收费代抢４０００＋.
+黄牛 / 收费代抢４０００＋
 
 ## 使用
 
 [下载地址](https://github.com/biliticket/transition-ticket/releases)
 
-注意:
+### 注意事项
 
 1. MacOS/Linux用户请根据*手动安装*流程安装进行使用;
-2. 现仅支持部分活动, 主要是类似于BW2024这样的*实名制 一人一票 无选座*活动, 后期会增加更多类型的票务支持;
-3. 如使用浏览器登录功能, 您的电脑里必须安装Chrome/Edge/Firefox浏览器, 如有安装还是提供无法启动, 则需要自行安装其中一个浏览器的Web Driver,
-4. assest/alarm.wav文件为语音提醒文件, 可自行更换其他提示音.
+2. 如使用浏览器登录功能, 您的电脑里必须安装Chrome/Edge/Firefox浏览器, 如有安装还是提供无法启动, 则需要自行安装其中一个浏览器的Web Driver,
+3. assest/alarm.wav文件为语音提醒文件, 可自行更换其他提示音.
 
 ### 手动安装
 
@@ -51,17 +50,6 @@ python cli.py
 
 ![FSM](assest/fsm.png)
 
-## 开发计划
-
-- [ ] Async
-- [ ] 其他票种可购情况
-- [ ] 检测配置文件完整性
-- [ ] 修改打包模式为目录模式, 而不是单文件模式
-- [ ] 显示版本号
-- [ ] 多种类型活动抢票
-- [ ] 参数启动
-- [ ] 图形界面(PySide6)
-
 ## 开发
 
 - Python >=3.10,<3.13
@@ -76,7 +64,7 @@ poetry install --with dev,graph
 pre-commit install
 
 # 更新
-poetry update
+poetry update --with dev,graph --sync
 pip freeze > requirements.txt
 pre-commit autoupdate
 
