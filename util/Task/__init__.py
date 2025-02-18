@@ -68,6 +68,7 @@ class Task:
 
         # Code
         self.skipToken = False
+        self.countdownOver = False
         self.queryTokenCode = 114514
         self.riskProcessCode = 114514
         self.queryTicketCode = False
@@ -110,16 +111,7 @@ class Task:
         self.machine.add_transition(
             trigger="WaitAvailable",
             source="等待开票",
-            dest="创建订单",
-            # 倒计时30s时已获取Token
-            conditions=lambda: self.skipToken,
-        )
-        self.machine.add_transition(
-            trigger="WaitAvailable",
-            source="等待开票",
             dest="获取Token",
-            # 无倒计时, 开始获取Token
-            conditions=lambda: not self.skipToken,
         )
 
         # 获取Token结束
@@ -161,6 +153,7 @@ class Task:
             conditions=lambda: self.riskProcessCode != 0,
         )
 
+        # 等待余票结束
         self.machine.add_transition(
             trigger="QueryTicket",
             source="等待余票",
@@ -261,34 +254,28 @@ class Task:
 
         if countdown > 0:
             logger.warning("【等待开票】请确保本机时间是北京时间, 服务器用户尤其要注意!")
+            self.countdownOver = False
 
             while countdown > 0:
                 countdown = start_time - int(time())
 
                 if countdown >= 3600:
-                    logger.info(f"【等待开票】需要等待 {countdown/60:.1f} 分钟")
+                    logger.info(f"【等待开票】需要等待 {countdown / 60:.1f} 分钟")
                     sleep(600)
                     countdown -= 600
 
                 elif 3600 > countdown >= 600:
-                    logger.info(f"【等待开票】需要等待 {countdown/60:.1f} 分钟")
+                    logger.info(f"【等待开票】需要等待 {countdown / 60:.1f} 分钟")
                     sleep(60)
                     countdown -= 60
 
                 elif 600 > countdown > 60:
-                    logger.info(f"【等待开票】准备开票! 需要等待 {countdown/60:.1f} 分钟")
+                    logger.info(f"【等待开票】准备开票! 需要等待 {countdown / 60:.1f} 分钟")
                     sleep(5)
                     countdown -= 5
 
-                elif countdown == 30:
-                    logger.info("【等待开票】即将开票! 正在提前获取Token...")
-                    self.QueryTokenAction()
-                    self.skipToken = True
-                    if self.queryTokenCode == -401:
-                        self.RiskProcessAction()
-
                 elif 60 > countdown > 1:
-                    logger.info(f"【等待开票】即将开票! 需要等待 {countdown-1} 秒")
+                    logger.info(f"【等待开票】即将开票! 需要等待 {countdown - 1} 秒")
                     sleep(1)
                     countdown -= 1
 
@@ -297,10 +284,18 @@ class Task:
                     logger.info("【等待开票】即将开票!")
                     sleep(countdown)
 
-            if countdown == 0:
-                logger.info("【等待开票】等待结束! 开始抢票")
+                # 预处理
+                if countdown == 30:
+                    self.api.QueryPrice()
+                    logger.info("【等待开票】已缓存商品信息")
+
+        elif countdown == 0:
+            logger.info("【等待开票】等待结束! 开始抢票")
+            self.countdownOver = True
+
         else:
             logger.info("【等待开票】已开票! 开始进入抢票模式")
+            self.countdownOver = True
 
     @logger.catch
     def QueryTokenAction(self) -> None:
@@ -337,10 +332,10 @@ class Task:
                 logger.error(f"【获取Token】{self.queryTokenCode}: {msg}")
 
         # 顺路
-        if not self.queryCache:
-            logger.info("【获取Token】已缓存商品信息")
-            self.api.QueryAmount()
+        if not self.queryCache and self.countdownOver:
+            self.api.QueryPrice()
             self.queryCache = True
+            logger.info("【获取Token】已缓存商品信息")
 
     @logger.catch
     def RiskProcessAction(self) -> None:
@@ -443,10 +438,6 @@ class Task:
                 logger.success(f"【创建订单】订单创建成功! {msg}")
                 self.availableTime = int(time())
 
-            # 存在未付款订单
-            case 100079:
-                logger.success("【创建订单】存在未付款/未完成订单! 无需再次创建")
-
             # Token过期
             case x if 100050 <= x <= 100059:
                 logger.warning("【创建订单】Token过期! 即将重新获取")
@@ -476,6 +467,11 @@ class Task:
                 sleep(5)
                 sys.exit()
 
+            # 存在未付款订单/有尚未完成订单
+            case 100079 | 100048:
+                logger.warning("【创建订单】存在冲突订单! 请先支付或取消这一单")
+                self.AutoSleepInterval()
+
             # 超过购买数量
             case 100098:
                 logger.error("【创建订单】该票种已超过可购买数量! 请更换账号或票种")
@@ -485,10 +481,7 @@ class Task:
 
             # 本项目需要联系人信息
             case 209001:
-                logger.error("【创建订单】目前仅支持实名制一人一票类活动哦~(其他类型活动也用不着上脚本吧啊喂)")
-                logger.warning("程序正在准备退出...")
-                sleep(5)
-                sys.exit()
+                logger.error("【创建订单】本项目需要联系人信息! 请补充联系人信息")
 
             # 项目/票种不可售 等待开票
             case 100016 | 100017:
@@ -624,8 +617,8 @@ class Task:
             "创建订单状态": "CreateStatus",
         }
         try:
-            while self.state != "完成":  # type: ignore
-                self.trigger(job[self.state])  # type: ignore
+            while self.state != "完成":
+                self.trigger(job[self.state])
             return True
 
         except KeyboardInterrupt:

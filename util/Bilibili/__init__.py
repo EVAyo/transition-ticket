@@ -1,4 +1,5 @@
 import json
+import secrets
 from random import randint
 from time import time
 
@@ -20,7 +21,9 @@ class Bilibili:
         screenId: int,
         skuId: int,
         buyer: dict,
+        deliver: dict,
         phone: str,
+        userinfo: dict,
         orderType: int = 1,
         count: int = 1,
     ):
@@ -32,6 +35,9 @@ class Bilibili:
         screenId: 场次ID
         skuId: 商品ID
         buyer: 购买者信息
+        deliver: 收货信息
+        phone: 手机号
+        userinfo: 用户信息
         orderType: 订单类型
         count: 购买数量
         """
@@ -42,6 +48,7 @@ class Bilibili:
         self.skuId = skuId
         self.buyer = buyer
         self.phone = phone
+        self.userinfo = userinfo
 
         self.orderType = orderType
         self.count = count
@@ -55,6 +62,12 @@ class Bilibili:
         self.orderToken = ""
         self.risked = False
 
+        self.deliver = deliver
+        self.deliverNeed = False
+        self.ContactNeed = False
+        self.deliverFee = 0
+        self.payment = 0
+
     @logger.catch
     def GetSaleStartTime(self) -> tuple:
         """
@@ -66,6 +79,7 @@ class Bilibili:
 
         # 成功
         if code == 0:
+            self.deliverNeed = res["data"]["has_paper_ticket"]
             for _i, screen in enumerate(res["data"]["screen_list"]):
                 if screen["id"] == self.screenId:
                     for _j, sku in enumerate(screen["ticket_list"]):
@@ -231,7 +245,6 @@ class Bilibili:
 
                 # 有保存Sku位置
                 if path["id"] == self.skuId:
-                    self.cost = path["price"]
                     clickable = path["clickable"]
                     salenum = path["sale_flag_number"]
                     num = path["num"]
@@ -242,7 +255,6 @@ class Bilibili:
                         if screen["id"] == self.screenId:
                             for j, sku in enumerate(screen["ticket_list"]):
                                 if sku["id"] == self.skuId:
-                                    self.cost = sku["price"]
                                     clickable = sku["clickable"]
                                     salenum = sku["sale_flag_number"]
                                     num = sku["num"]
@@ -255,6 +267,48 @@ class Bilibili:
                 num = 0
 
         return code, msg, clickable, salenum, num
+
+    @logger.catch
+    def QueryPrice(self) -> None:
+        """
+        获取价格
+        self.cost: 票价
+        self.deliverFee: 邮费
+        """
+        url = f"https://show.bilibili.com/api/ticket/project/getV2?version=134&id={self.projectId}&project_id={self.projectId}&requestSource={self.scene}"
+        res = self.net.Response(method="get", url=url)
+        code = res["errno"]
+
+        match code:
+            # 成功
+            case 0:
+                data = res["data"]
+                screen = data["screen_list"][self.screenPath]
+                sku = data["screen_list"][self.screenPath]["ticket_list"][self.skuPath]
+
+                # 有保存Screen位置
+                if screen["id"] == self.skuId:
+                    self.deliverFee = max(screen["express_fee"], 0)
+
+                # 有保存Sku位置
+                if sku["id"] == self.skuId:
+                    self.cost = sku["price"]
+
+                # 没保存Screen/Sku位置
+                else:
+                    for _i, screen in enumerate(data["screen_list"]):
+                        if screen["id"] == self.screenId:
+                            self.deliverFee = max(screen["express_fee"], 0)
+
+                            for _j, sku in enumerate(screen["ticket_list"]):
+                                if sku["id"] == self.skuId:
+                                    self.cost = sku["price"]
+                                    break
+
+                            break
+            case _:
+                self.cost = 0
+                self.deliverFee = 0
 
     @logger.catch
     def CreateOrder(self) -> tuple:
@@ -274,15 +328,28 @@ class Bilibili:
             "screen_id": self.screenId,
             "sku_id": self.skuId,
             "count": self.count,
-            "pay_money": self.cost * self.count,
+            "pay_money": self.cost * self.count + self.deliverFee,
             "order_type": self.orderType,
             "timestamp": timestamp,
             "buyer_info": json.dumps(self.buyer),
             "token": self.token,
-            "deviceId": "",
+            "deviceId": secrets.token_hex(),
             "clickPosition": clickPosition,
             "requestSource": self.scene,
         }
+
+        # 邮寄票
+        if self.deliverNeed:
+            params["deliver_info"] = json.dumps(self.deliver, ensure_ascii=False)
+            params["pay_money"] = max(self.cost * self.count + self.deliverFee, self.payment)
+            params["buyer"] = self.userinfo["username"]
+            params["tel"] = self.phone
+
+        # 联系人信息
+        if self.ContactNeed:
+            params["buyer"] = self.userinfo["username"]
+            params["tel"] = self.phone
+
         res = self.net.Response(method="post", url=url, params=params)
         code = res["errno"]
         msg = res["msg"]
@@ -290,11 +357,28 @@ class Bilibili:
         match code:
             # 成功
             case 0:
+                self.orderId = res["data"]["orderId"]
                 self.orderToken = res["data"]["token"]
 
             # 存在订单
             case 100079:
-                self.orderId = res["data"]["order_id"]
+                self.orderId = res["data"]["orderId"]
+
+            # 票价错误
+            case 100034:
+                self.payment = res["data"]["pay_money"]
+                logger.info(f"【创建订单】更新票价为：{self.payment / 100}")
+
+            # 未预填收货联系人信息
+            case 209001:
+                self.ContactNeed = True
+                tmp = self.net.Response(
+                    method="post",
+                    url="https://show.bilibili.com/api/ticket/buyer/saveContactInfo",
+                    params={"username": self.userinfo["username"], "tel": self.phone},
+                )
+                if tmp["errno"] == 0:
+                    logger.info("【创建订单】已自动设置收货联系人信息")
 
         return code, msg
 
@@ -303,12 +387,13 @@ class Bilibili:
         """
         创建订单状态
         """
-        url = f"https://show.bilibili.com/api/ticket/order/createstatus?token={self.orderToken}&project_id={self.projectId}"
+        url = f"https://show.bilibili.com/api/ticket/order/createstatus?token={self.orderToken}&project_id={self.projectId}&orderId={self.orderId}"
         res = self.net.Response(method="get", url=url)
         code = res["errno"]
 
-        if code == 0:
-            self.orderId = res["data"]["order_id"]
+        # 100012: 订单未完成,请等待 且 订单ID相同, 说明订单已经创建
+        if code == 100012 and self.orderId == res["data"]["order_id"]:
+            code = 0
 
         return code, res["msg"]
 

@@ -4,7 +4,6 @@ on:
   push:
     tags:
       - "v*.*.*"
-  pull_request:
 
 permissions:
   contents: write
@@ -22,7 +21,7 @@ jobs:
       - name: Install Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: '3.12'
 
       - name: Install Poetry
         uses: abatilo/actions-poetry@v2
@@ -33,7 +32,7 @@ jobs:
           poetry config virtualenvs.in-project true --local
 
       - name: Install Dependencies
-        run: poetry install
+        run: poetry install --with dev
 
       - name: Package
         run: poetry run pyinstaller --clean --noconfirm --log-level WARN cli.spec

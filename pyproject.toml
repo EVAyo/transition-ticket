@@ -25,13 +25,13 @@ py-machineid = "^0.5.1"
 plyer = "^2.1.0"
 pyaudio = "^0.2.14"
 pytz = "^2024.1"
-pyinstaller = "^6.7.0"
 psutil = "^6.0.0"
 
 [tool.poetry.group.dev]
 optional = true
 
 [tool.poetry.group.dev.dependencies]
+pyinstaller = "^6.7.0"
 ruff = "^0.5.0"
 pyupgrade = "^3.15.2"
 
@@ -44,22 +44,12 @@ graphviz = "^0.20.3"
 pygraphviz = "^1.13"
 
 [tool.ruff]
-line-length = 190
-
-[tool.ruff.lint]
-select = ["B", "C4", "C9", "E", "F", "I", "PL", "S", "SIM", "U", "W", "YTT"]
-ignore = ["B006", "S311", "S501"]
-
-[tool.ruff.lint.mccabe]
-max-complexity = 17
-
-[tool.ruff.lint.pylint]
-max-args = 10
-max-statements = 57
-max-returns = 7
-max-branches = 13
-allow-magic-value-types = ["int","str"]
+line-length = 192
 
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
+
+[[tool.poetry.source]]
+name = "TUNA"
+url = "https://pypi.tuna.tsinghua.edu.cn/simple/"

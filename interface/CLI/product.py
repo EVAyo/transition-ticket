@@ -71,8 +71,7 @@ class ProductCli:
             """
             活动
             """
-            print(f"{self.BLUE}[{self.YELLOW}!{self.BLUE}]{self.RESET} BW2024链接: show.bilibili.com/platform/detail.html?id=85939")
-            print(f"{self.BLUE}[{self.YELLOW}!{self.BLUE}]{self.RESET} BML2024链接: show.bilibili.com/platform/detail.html?id=85938")
+            print(f"{self.BLUE}[{self.YELLOW}!{self.BLUE}]{self.RESET} CP30链接: show.bilibili.com/platform/detail.html?id=92785")
             url = self.data.Inquire(
                 type="Text",
                 message="请粘贴要抢的活动的网页链接",
@@ -128,9 +127,7 @@ class ProductCli:
             try:
                 skuInfo = self.info.Sku(screenId)
                 lists = {
-                    f"{self.YELLOW if skuInfo[i]['display_name'] == '预售中' else ''}"
-                    f"{skuInfo[i]['name']} {skuInfo[i]['price']}元 ({skuInfo[i]['display_name']})"
-                    f"{self.RESET}": skuInfo[i]["id"]
+                    f"{self.YELLOW if skuInfo[i]['display_name'] == '预售中' else ''}{skuInfo[i]['name']} {skuInfo[i]['price']}元 ({skuInfo[i]['display_name']}){self.RESET}": skuInfo[i]["id"]
                     for i in range(len(skuInfo))
                 }
                 select = self.data.Inquire(
@@ -167,6 +164,9 @@ class ProductCli:
         skuId, skuSelected = SkuStep(screenId=self.config["screenId"])
         self.config["skuId"] = skuId
 
-        self.conf.Save(FilenameStep(name=f"{self.info.Project()['name']} ({skuSelected})"), self.config)
+        self.conf.Save(
+            FilenameStep(name=f"{self.info.Project()['name']} ({skuSelected})"),
+            self.config,
+        )
         logger.info("【商品配置初始化】配置已保存!")
         return self.config

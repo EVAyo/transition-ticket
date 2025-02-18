@@ -40,7 +40,7 @@ class Notice:
         获取资源文件夹(涉及到Pyinstaller)
         """
         try:
-            base_path = sys._MEIPASS  # type: ignore
+            base_path = sys._MEIPASS
         except AttributeError:
             base_path = getcwd()
         return path.join(base_path, dir)
@@ -58,7 +58,7 @@ class Notice:
             app_icon=self.appIconPath,
             app_name=self.appName,
             timeout=timeout,
-        )  # type: ignore
+        )
 
     @logger.catch
     def Sound(self, time: int = 3) -> None:
@@ -93,6 +93,7 @@ class Notice:
             "template": "html",
             "channel": "wechat",
         }
+
         self.net.Response(method="post", url=url, params=data, isJson=False)
 
     @logger.catch
@@ -101,7 +102,11 @@ class Notice:
         钉钉
         """
         url = f"https://oapi.dingtalk.com/robot/send?access_token={token}"
-        data = {"msgtype": "text", "text": {"content": self.message}, "at": {"isAtAll": False}}
+        data = {
+            "msgtype": "text",
+            "text": {"content": self.message},
+            "at": {"isAtAll": False},
+        }
         self.net.Response(method="post", url=url, params=data)
 
     @logger.catch
@@ -161,7 +166,7 @@ class Notice:
         # 邮件发送方邮箱地址
         sender = params["sender"]
         # 邮件接受方邮箱地址，注意需要[]包裹，这意味`着你可以写多个邮件地址群发
-        receivers = params["receivers"]
+        receivers = params["receiver"]
 
         # 设置email信息
         # 邮件内容设置
@@ -186,6 +191,6 @@ class Notice:
                 # 退出
                 smtpObj.quit()
                 # logger.info(i18n_format("send_success"))
-                logger.info("send_success")
+                logger.info("邮件提醒发送成功")
             except smtplib.SMTPException as e:
                 logger.error(e)  # 打印错误
